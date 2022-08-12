@@ -1,0 +1,39 @@
+version: '3'
+volumes:
+  pg_data:
+services:
+  postgres-db:
+    image: postgres:13
+    environment:
+      - POSTGRES_PASSWORD=pgpassword123
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+  traefik:
+    image: "traefik:v2.8"
+    container_name: "traefik"
+    volumes:
+      - ./traefik:/etc/traefik
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "80:80"
+      - "8080:8080"
+  api:
+    build:
+      context: ./api
+      target: final
+    labels:
+      - traefik.enable=true
+      - traefik.http.middlewares.api-stripprefix.stripprefix.prefixes=/api
+      - traefik.http.middlewares.api-stripprefix.stripprefix.forceSlash=false
+      - traefik.http.routers.api.entrypoints=web
+      - traefik.http.routers.api.rule=PathPrefix(`/api/`)
+      - traefik.http.routers.api.middlewares=api-stripprefix@docker
+    environment:
+      - ENVIRONMENT=dev
+      - DATABASE_URL=postgres://postgres:pgpassword123@postgres-db:5432/vtex_mirror
+    expose:
+      - "8080"
+    depends_on:
+      - postgres-db
